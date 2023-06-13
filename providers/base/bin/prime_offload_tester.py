@@ -58,7 +58,7 @@ class PrimeOffloader:
         ----------
         pci_name: pci device name in NNNN:NN:NN.N format
         """
-        cmd = f'grep -lr --include=name "{pci_name}" \
+        cmd = f'sudo grep -lr --include=name "{pci_name}" \
         /sys/kernel/debug/dri 2>/dev/null'
         try:
             card_path = subprocess.run(cmd, shell=True,
@@ -77,7 +77,7 @@ class PrimeOffloader:
         ----------
         pci_name: pci device name in NNNN:NN:NN.N format
         """
-        cmd = 'lshw -c display -json'
+        cmd = 'sudo lshw -c display -json'
         try:
             card_infos = subprocess.run(cmd, shell=True,
                                         stdout=subprocess.PIPE,
@@ -100,16 +100,17 @@ class PrimeOffloader:
         card_id: card id of dri device
         """
         cmd_without_args = cmd.split(' ')[0]
-        for index in range(10):
+        for index in range(11):
             time.sleep(2)
             try:
-                clients_path = f"/sys/kernel/debug/dri/{card_id}/clients"
-                with open(clients_path, 'r') as process:
-                    for line in process.readlines():
-                        if cmd_without_args in line:
-                            print(f"Find process [{cmd}] running on "
-                                  f"specific GPU\n[{card_id}][{card_name}]\n")
-                            return
+                read_clients_cmd = f"sudo cat /sys/kernel/debug/dri/{card_id}/clients"
+                clients = subprocess.run(read_clients_cmd, shell=True,
+                                         stdout=subprocess.PIPE,
+                                         universal_newlines=True)
+                if cmd_without_args in clients.stdout:
+                    print(f"Find process [{cmd}] running on "
+                          f"specific GPU\n[{card_id}][{card_name}]\n")
+                    return
             except OSError:
                 # Missing file or permissions?
                 print("Couldn't open file for reading clients of dri device")
