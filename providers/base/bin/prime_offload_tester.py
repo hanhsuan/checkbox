@@ -41,7 +41,7 @@ class PrimeOffloader:
     Attributes
     ----------
     logger : obj
-        console log
+        console logger
     check_result : int
         store the result of checking offloading is ok or not.
 
@@ -118,6 +118,8 @@ class PrimeOffloader:
         cmd: command that running under prime offload
 
         card_id: card id of dri device
+
+        card_name: card name of dri device
         """
         cmd_without_args = cmd.split(' ')[0]
         for index in range(11):
@@ -129,9 +131,10 @@ class PrimeOffloader:
                                          stdout=subprocess.PIPE,
                                          universal_newlines=True)
                 if cmd_without_args in clients.stdout:
-                    self.logger.info(f"Find process [{cmd}] running on "
-                                     f"specific GPU\n[{card_id}]"
-                                     f"[{card_name}]\n")
+                    self.logger.info("Checking success:")
+                    self.logger.info(f"  Offload process:[{cmd}]")
+                    self.logger.info(f"  Card ID:[{card_id}]")
+                    self.logger.info(f"  Device Name:[{card_name}]")
                     self.check_result = PrimeOffloaderError.NO_ERROR
                     return
                 self.check_result = PrimeOffloaderError.OFFLOAD_FAIL
@@ -141,14 +144,15 @@ class PrimeOffloader:
                                  "reading clients of dri device")
                 self.check_result = PrimeOffloaderError.OFFLOAD_FAIL
                 return
-        self.logger.info(f"Couldn't find process [{cmd}]"
+        self.logger.info("Checking fail:")
+        self.logger.info(f"  Couldn't find process [{cmd}]"
                          f" running after check {index} times")
         self.check_result = PrimeOffloaderError.OFFLOAD_FAIL
 
     def check_nv_offload_env(self):
         """
         prime offload of nvidia driver is limited.
-        Only on-demand is supported.
+        Only on-demand mode is supported.
         """
         # check prime-select to make sure system with nv driver.
         # If no nv driver, prime offload is fine for other drivers.
