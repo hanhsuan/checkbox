@@ -22,8 +22,8 @@ include:
  graphics/1_minimum_resolution_.*
  graphics/2_driver_version_.*                   certification-status=blocker
  graphics/2_minimum_resolution_.*
- graphics/1_glxgears_.*                         certification-status=blocker
- graphics/2_glxgears_.*                         certification-status=blocker
+ graphics/1_glxgears_auto_.*                    certification-status=blocker
+ graphics/2_glxgears_auto_.*                    certification-status=blocker
  suspend/resolution_before_suspend              certification-status=blocker
 bootstrap_include:
     graphics_card
@@ -36,15 +36,11 @@ _description:
 include:
  miscellanea/chvt
  graphics/1_maximum_resolution_.*               certification-status=blocker
- graphics/1_glxgears_.*                         certification-status=blocker
  graphics/1_rotation_.*                         certification-status=blocker
  graphics/1_video_.*                            certification-status=blocker
  graphics/1_cycle_resolution_.*                 certification-status=non-blocker
- graphics/2_maximum_resolution_.*               certification-status=blocker
- graphics/2_glxgears_.*                         certification-status=blocker
- graphics/2_rotation_.*                         certification-status=blocker
- graphics/2_video_.*                            certification-status=blocker
- graphics/2_cycle_resolution_.*                 certification-status=non-blocker
+ graphics/1_glxgears_check_.*                   certification-status=blocker
+ graphics/2_glxgears_check_.*                   certification-status=blocker
 bootstrap_include:
     graphics_card
 
@@ -69,11 +65,8 @@ include:
  after-suspend-graphics/1_driver_version_.*               certification-status=blocker
  after-suspend-graphics/1_gl_support_.*                   certification-status=blocker
  after-suspend-graphics/1_minimum_resolution_.*
- after-suspend-graphics/2_driver_version_.*               certification-status=blocker
- after-suspend-graphics/2_gl_support_.*                   certification-status=blocker
- after-suspend-graphics/2_minimum_resolution_.*
- after-suspend-graphics/1_glxgears_.*                     certification-status=blocker
- after-suspend-graphics/2_glxgears_.*                     certification-status=blocker
+ after-suspend-graphics/1_glxgears_auto_.*                certification-status=blocker
+ after-suspend-graphics/2_glxgears_auto_.*                certification-status=blocker
  suspend/resolution_after_suspend                         certification-status=blocker
 
 id: after-suspend-graphics-gpu-cert-manual
@@ -86,17 +79,12 @@ include:
  after-suspend-miscellanea/chvt
  suspend/display_after_suspend                            certification-status=blocker
  after-suspend-graphics/1_maximum_resolution_.*           certification-status=blocker
- after-suspend-graphics/1_glxgears_.*                     certification-status=blocker
  after-suspend-graphics/1_rotation_.*                     certification-status=blocker
  after-suspend-graphics/1_video_.*                        certification-status=blocker
  after-suspend-graphics/1_cycle_resolution_.*             certification-status=non-blocker
+ after-suspend-graphics/1_glxgears_check_.*               certification-status=blocker
+ after-suspend-graphics/2_glxgears_check_.*               certification-status=blocker
  suspend/1_xrandr_screens_after_suspend.tar.gz_auto
- after-suspend-graphics/2_maximum_resolution_.*           certification-status=blocker
- after-suspend-graphics/2_glxgears_.*                     certification-status=blocker
- after-suspend-graphics/2_rotation_.*                     certification-status=blocker
- after-suspend-graphics/2_video_.*                        certification-status=blocker
- after-suspend-graphics/2_cycle_resolution_.*             certification-status=non-blocker
- suspend/2_xrandr_screens_after_suspend_.*.tar.gz_auto
 
 
 id: graphics-integrated-gpu-cert-full

@@ -41,24 +41,6 @@ include:
  monitor/1_thunderbolt3_.*                  certification-status=non-blocker
  audio/1_playback_thunderbolt3_.*           certification-status=non-blocker
  thunderbolt3/daisy-chain                   certification-status=non-blocker
- monitor/1_vga_.*                           certification-status=blocker
- monitor/1_multi-head_.*                    certification-status=blocker
- monitor/2_powersaving_.*                   certification-status=blocker
- monitor/2_dim_brightness_.*                certification-status=blocker
- monitor/2_displayport_.*                   certification-status=blocker
- audio/2_playback_displayport_.*            certification-status=blocker
- monitor/2_type-c_displayport_.*            certification-status=blocker
- audio/2_playback_type-c_displayport_.*     certification-status=blocker
- monitor/2_type-c_hdmi_.*                   certification-status=blocker
- audio/2_playback_type-c_hdmi_.*            certification-status=blocker
- monitor/2_type-c_vga_.*                    certification-status=blocker
- monitor/2_dvi_.*                           certification-status=blocker
- monitor/2_hdmi_.*                          certification-status=blocker
- audio/2_playback_hdmi_.*                   certification-status=blocker
- monitor/2_thunderbolt3_.*                  certification-status=non-blocker
- audio/2_playback_thunderbolt3_.*           certification-status=non-blocker
- monitor/2_vga_.*                           certification-status=blocker
- monitor/2_multi-head_.*                    certification-status=blocker
 bootstrap_include:
     graphics_card
 
@@ -102,25 +84,6 @@ include:
  after-suspend-monitor/1_thunderbolt3_.*                  certification-status=non-blocker
  after-suspend-audio/1_playback_thunderbolt3_.*           certification-status=non-blocker
  after-suspend-thunderbolt3/daisy-chain                   certification-status=non-blocker
- after-suspend-monitor/1_vga_.*                           certification-status=blocker
- after-suspend-monitor/1_multi-head_.*                    certification-status=blocker
- after-suspend-monitor/2_powersaving_.*                   certification-status=blocker
- after-suspend-monitor/2_dim_brightness_.*                certification-status=blocker
- after-suspend-monitor/2_displayport_.*                   certification-status=blocker
- after-suspend-audio/2_playback_displayport_.*            certification-status=blocker
- after-suspend-monitor/2_type-c_displayport_.*            certification-status=blocker
- after-suspend-audio/2_playback_type-c_displayport_.*     certification-status=blocker
- after-suspend-monitor/2_type-c_hdmi_.*                   certification-status=blocker
- after-suspend-audio/2_playback_type-c_hdmi_.*            certification-status=blocker
- after-suspend-monitor/2_type-c_vga_.*                    certification-status=blocker
- after-suspend-monitor/2_dvi_.*                           certification-status=blocker
- after-suspend-monitor/2_hdmi_.*                          certification-status=blocker
- after-suspend-audio/2_playback_hdmi_.*                   certification-status=blocker
- after-suspend-monitor/2_thunderbolt3_.*                  certification-status=non-blocker
- after-suspend-audio/2_playback_thunderbolt3_.*           certification-status=non-blocker
- after-suspend-thunderbolt3/daisy-chain                   certification-status=non-blocker
- after-suspend-monitor/2_vga_.*                           certification-status=blocker
- after-suspend-monitor/2_multi-head_.*                    certification-status=blocker
 bootstrap_include:
     graphics_card
 
