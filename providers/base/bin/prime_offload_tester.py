@@ -44,6 +44,26 @@ class PrimeOffloader:
     logger = logging.getLogger()
     check_result = False
 
+    def _run_command(self, cmd: list, shell=False) -> str:
+        """
+        use subprocess.check_output to execute command
+
+        :param cmd: the command will be executed
+
+        :param shell: enbale shell or not
+
+        :returns: Ouput of command
+        """
+        try:
+            return subprocess.check_output(cmd,
+                                           shell=shell,
+                                           universal_newlines=True)
+
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            raise SystemExit("Running command:{} failed due to {}"
+                             .format(cmd, repr(e)))
+
+
     def find_card_id(self, pci_name: str) -> str:
         """
         use pci name to find card id under /sys/kernel/debug/dri
@@ -65,12 +85,10 @@ class PrimeOffloader:
                 "/sys/kernel/debug/dri",
             ]
 
-            card_path = subprocess.check_output(cmd, universal_newlines=True)
+            card_path = self._run_command(cmd)
             return card_path.split("/")[5]
         except IndexError as e:
             raise SystemExit("return value format error {}".format(repr(e)))
-        except subprocess.CalledProcessError as e:
-            raise SystemExit("run command failed {}".format(repr(e)))
 
     def find_card_name(self, pci_name: str) -> str:
         """
@@ -82,7 +100,7 @@ class PrimeOffloader:
         """
         cmd = ["lshw", "-c", "display", "-json"]
         try:
-            card_infos = subprocess.check_output(cmd, universal_newlines=True)
+            card_infos = self._run_command(cmd)
             infos = json.loads(card_infos)
             for info in infos:
                 if pci_name in info["businfo"]:
@@ -90,8 +108,6 @@ class PrimeOffloader:
             raise SystemExit("Card name not found")
         except (KeyError, TypeError, json.decoder.JSONDecodeError) as e:
             raise SystemExit("return value format error {}".format(e))
-        except subprocess.CalledProcessError as e:
-            raise SystemExit("run command failed {}".format(repr(e)))
 
     def get_clients(self, card_id: str) -> str:
         """
@@ -112,14 +128,7 @@ class PrimeOffloader:
             "cat",
             "/sys/kernel/debug/dri/{}/clients".format(card_id),
         ]
-        try:
-            return subprocess.check_output(
-                read_clients_cmd, universal_newlines=True
-            )
-        except subprocess.CalledProcessError:
-            self.logger.info(
-                "Couldn't get clients on specific GPU{}".format(card_id)
-            )
+        return self._run_command(read_clients_cmd)
 
     def check_offload(
         self, cmd: list, card_id: str, card_name: str, timeout: str
@@ -152,6 +161,41 @@ class PrimeOffloader:
         self.logger.info("  Couldn't find process [{}]".format(cmd))
         self.check_result = True
 
+    def find_offload(self, cmd: list, timeout: str):
+        """
+        Use to find provided command is executed on which GPU.
+
+        :param cmd: command that running under prime offload
+
+        :param timeout: timeout for offloaded command
+        """
+        delay = timeout / 10
+
+        deadline = time.time() + timeout
+
+        find_cmd = [
+            "grep",
+            "-lr",
+            "--include=clients",
+            cmd,
+            "/sys/kernel/debug/dri",
+        ]
+
+        while time.time() < deadline:
+            time.sleep(delay)
+            card_path = self._run_command(find_cmd)
+            if card_path:
+                first_card = card_path.splitlines()[0]
+                card_name = self._run_command(["cat", first_card.replace("clients", "name")])
+                bdf = card_name.split()[1].split("=")[1]
+                self.logger.info("Process is running on:")
+                self.logger.info("  Offload process:[{}]".format(cmd))
+                self.logger.info("  Card ID:[{}]".format(self.find_card_id(bdf)))
+                self.logger.info("  Device Name:[{}]".format(self.find_card_name(bdf)))
+                return
+        self.logger.info("Checking fail:")
+        self.logger.info("  Couldn't find process [{}]".format(cmd))
+
     def check_nv_offload_env(self):
         """
         prime offload of nvidia driver is limited.
@@ -181,6 +225,63 @@ class PrimeOffloader:
                 "No prime-select, it should be ok to run prime offload"
             )
 
+    def _reformat_cmd_timeout(self, cmd: list, timeout: int) -> (list, int):
+        if "timeout" in cmd:
+            raise SystemExit("Put timeout in command isn't allowed")
+
+        if timeout > 0:
+            offload_cmd = ["timeout", str(timeout)] + cmd
+        else:
+            # if timeout <=0 will make check_offload failed.
+            # Set the timeout to the default value
+            log_str = (
+                "Timeout {}s is invalid,"
+                " remove the timeout setting"
+                " and change check_offload to run 20s".format(timeout)
+            )
+            self.logger.info(log_str)
+            timeout = 20
+            offload_cmd = cmd
+        return (offload_cmd, timeout)
+
+    def cmd_runner(self, cmd: str, env: dict = None):
+        try:
+            with subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+            ) as runner:
+
+                self.logger.info("running command:[{}]".format(cmd))
+
+                # redirect command output real time
+                while runner.poll() is None:
+                    line = runner.stdout.readline().strip()
+                    self.logger.info(line)
+        except subprocess.CalledProcessError as e:
+            raise SystemExit("run command failed {}".format(repr(e)))
+
+    def run_cmd(self, cmd: str, timeout: int):
+        """
+        run offload command and find it runs on which GPU
+
+        :param cmd: command that running under prime offload
+
+        :param timeout: timeout for offloaded command
+        """
+        cmd = cmd.split()
+        (modified_cmd, timeout) = self._reformat_cmd_timeout(cmd, timeout)
+
+        # use other thread to find offload
+        find_thread = threading.Thread(
+            target=self.find_offload, args=(cmd[0], timeout)
+        )
+        find_thread.start()
+        self.cmd_runner(modified_cmd)
+        find_thread.join()
+
+
     def run_offload_cmd(
         self, cmd: str, pci_name: str, driver: str, timeout: int
     ):
@@ -205,19 +306,7 @@ class PrimeOffloader:
             raise SystemExit("Put timeout in command isn't allowed")
 
         cmd = cmd.split()
-        if timeout > 0:
-            offload_cmd = ["timeout", str(timeout)] + cmd
-        else:
-            # if timeout <=0 will make check_offload failed.
-            # Set the timeout to the default value
-            log_str = (
-                "Timeout {}s is invalid,"
-                " remove the timeout setting"
-                " and change check_offload to run 20s".format(timeout)
-            )
-            self.logger.info(log_str)
-            timeout = 20
-            offload_cmd = cmd
+        (modified_cmd, timeout) = self._reformat_cmd_timeout(cmd, timeout)
 
         env = os.environ.copy()
         if driver in ("nvidia", "pcieport"):
@@ -239,25 +328,11 @@ class PrimeOffloader:
             target=self.check_offload, args=(cmd, card_id, card_name, timeout)
         )
         check_thread.start()
-        try:
-            with subprocess.Popen(
-                offload_cmd,
-                env=env,
-                stdout=subprocess.PIPE,
-                universal_newlines=True,
-            ) as offload:
+        self.cmd_runner(modified_cmd)
+        check_thread.join()
 
-                self.logger.info("offload command:[{}]".format(offload_cmd))
-
-                # redirect offload command output real time
-                while offload.poll() is None:
-                    line = offload.stdout.readline().strip()
-                    self.logger.info(line)
-            check_thread.join()
-            if self.check_result:
-                raise SystemExit("offload to specific GPU failed")
-        except subprocess.CalledProcessError as e:
-            raise SystemExit("run offload command failed {}".format(repr(e)))
+        if self.check_result:
+            raise SystemExit("offload to specific GPU failed")
 
     def parse_args(self, args=sys.argv[1:]):
         """
@@ -282,15 +357,13 @@ class PrimeOffloader:
             "-p",
             "--pci",
             type=str,
-            default="0000:00:02.0",
-            help="pci name in NNNN:NN:NN.N format (default: %(default)s)",
+            help="pci name in NNNN:NN:NN.N format, such as 0000:00:02.0",
         )
         parser.add_argument(
             "-d",
             "--driver",
             type=str,
-            default="i915",
-            help="Type of GPU driver (default: %(default)s)",
+            help="Type of GPU driver, such as i915",
         )
         parser.add_argument(
             "-t",
@@ -317,8 +390,11 @@ class PrimeOffloader:
         # Add console handler to logger
         self.logger.addHandler(console_handler)
 
-        # run_offload_cmd("glxgears", "0000:00:02.0", "i915", 0)
-        self.run_offload_cmd(args.command, args.pci, args.driver, args.timeout)
+        if args.pci and args.driver:
+            # run_offload_cmd("glxgears", "0000:00:02.0", "i915", 0)
+            self.run_offload_cmd(args.command, args.pci, args.driver, args.timeout)
+        else:
+            self.run_cmd(args.command, args.timeout)
 
 
 if __name__ == "__main__":
