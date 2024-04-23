@@ -55,33 +55,33 @@ class PrimeOffloader:
         :returns: Ouput of command
         """
         try:
-            return subprocess.check_output(cmd,
-                                           shell=shell,
-                                           universal_newlines=True)
+            return subprocess.check_output(
+                cmd, shell=shell, universal_newlines=True
+            )
 
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            raise SystemExit("Running command:{} failed due to {}"
-                             .format(cmd, repr(e)))
+            raise SystemExit(
+                "Running command:{} failed due to {}".format(cmd, repr(e))
+            )
 
-
-    def find_card_id(self, pci_name: str) -> str:
+    def find_card_id(self, pci_bdf: str) -> str:
         """
-        use pci name to find card id under /sys/kernel/debug/dri
+        use pci BDF to find card id under /sys/kernel/debug/dri
 
-        :param pci_name: pci device name in NNNN:NN:NN.N format
+        :param pci_bdf: pci device BDF in NNNN:NN:NN.N format
 
         :returns: card id
         """
-        pci_name_format = "[0-9]{4}:[0-9,a-f]{2}:[0-9,a-f]{2}.[0-9]"
-        if not re.match(pci_name_format, pci_name.lower()):
-            raise SystemExit("pci name format error")
+        pci_bdf_format = "[0-9]{4}:[0-9,a-f]{2}:[0-9,a-f]{2}.[0-9]"
+        if not re.match(pci_bdf_format, pci_bdf.lower()):
+            raise SystemExit("pci BDF format error")
 
         try:
             cmd = [
                 "grep",
                 "-lr",
                 "--include=name",
-                pci_name,
+                pci_bdf,
                 "/sys/kernel/debug/dri",
             ]
 
@@ -90,20 +90,20 @@ class PrimeOffloader:
         except IndexError as e:
             raise SystemExit("return value format error {}".format(repr(e)))
 
-    def find_card_name(self, pci_name: str) -> str:
+    def find_card_name(self, pci_bdf: str) -> str:
         """
-        use pci name to find card name by lshw
+        use pci BDF to find card name by lshw
 
-        :param pci_name: pci device name in NNNN:NN:NN.N format
+        :param pci_bdf: pci device BDF in NNNN:NN:NN.N format
 
         :returns: card name
         """
-        cmd = ["lshw", "-c", "display", "-json"]
+        cmd = ["lshw", "-c", "display", "-numeric", "-json"]
         try:
             card_infos = self._run_command(cmd)
             infos = json.loads(card_infos)
             for info in infos:
-                if pci_name in info["businfo"]:
+                if pci_bdf in info["businfo"]:
                     return info["product"]
             raise SystemExit("Card name not found")
         except (KeyError, TypeError, json.decoder.JSONDecodeError) as e:
@@ -161,13 +161,25 @@ class PrimeOffloader:
         self.logger.info("  Couldn't find process [{}]".format(cmd))
         self.check_result = True
 
+    def _find_bdf(self, card: str):
+        """
+        Use the /sys/kernel/debug/dri/<card id>/name to get pci BDF.
+
+        :param card: in /sys/kernel/debug/dri/<card id>/clients format
+
+        """
+        data_in_name = self._run_command(
+            ["cat", card.replace("clients", "name")]
+        )
+        return data_in_name.split()[1].split("=")[1]
+
     def find_offload(self, cmd: list, timeout: str):
         """
         Use to find provided command is executed on which GPU.
 
-        :param cmd: command that running under prime offload
+        :param cmd: command that is running
 
-        :param timeout: timeout for offloaded command
+        :param timeout: timeout for command
         """
         delay = timeout / 10
 
@@ -185,16 +197,27 @@ class PrimeOffloader:
             time.sleep(delay)
             card_path = self._run_command(find_cmd)
             if card_path:
-                first_card = card_path.splitlines()[0]
-                card_name = self._run_command(["cat", first_card.replace("clients", "name")])
-                bdf = card_name.split()[1].split("=")[1]
-                self.logger.info("Process is running on:")
-                self.logger.info("  Offload process:[{}]".format(cmd))
-                self.logger.info("  Card ID:[{}]".format(self.find_card_id(bdf)))
-                self.logger.info("  Device Name:[{}]".format(self.find_card_name(bdf)))
-                return
+                try:
+                    # The graphic will be shown such as 0 and 128 at the same time.
+                    # Therefore, pick up the first one
+                    first_card = card_path.splitlines()[0]
+                    bdf = self._find_bdf(first_card)
+                    self.logger.info("Process is running on:")
+                    self.logger.info("  process:[{}]".format(cmd))
+                    self.logger.info(
+                        "  Card ID:[{}]".format(self.find_card_id(bdf))
+                    )
+                    self.logger.info(
+                        "  Device Name:[{}]".format(self.find_card_name(bdf))
+                    )
+                    return
+                except IndexError as e:
+                    self.logger.info(
+                        "Finding card information failed {}".format(repr(e))
+                    )
         self.logger.info("Checking fail:")
         self.logger.info("  Couldn't find process [{}]".format(cmd))
+        self.check_result = True
 
     def check_nv_offload_env(self):
         """
@@ -262,7 +285,7 @@ class PrimeOffloader:
         except subprocess.CalledProcessError as e:
             raise SystemExit("run command failed {}".format(repr(e)))
 
-    def run_cmd(self, cmd: str, timeout: int):
+    def cmd_finder(self, cmd: str, timeout: int):
         """
         run offload command and find it runs on which GPU
 
@@ -281,29 +304,26 @@ class PrimeOffloader:
         self.cmd_runner(modified_cmd)
         find_thread.join()
 
+        if self.check_result:
+            raise SystemExit("Couldn't find process running on GPU")
 
-    def run_offload_cmd(
-        self, cmd: str, pci_name: str, driver: str, timeout: int
-    ):
+    def cmd_checker(self, cmd: str, pci_bdf: str, driver: str, timeout: int):
         """
         run offload command and check it runs on correct GPU
 
         :param cmd: command that running under prime offload
 
-        :param pci_name: pci device name in NNNN:NN:NN.N format
+        :param pci_bdf: pci device name in NNNN:NN:NN.N format
 
         :param driver: GPU driver, such as i915, amdgpu, nvidia
 
         :param timeout: timeout for offloaded command
         """
-        card_id = self.find_card_id(pci_name)
-        card_name = self.find_card_name(pci_name)
+        card_id = self.find_card_id(pci_bdf)
+        card_name = self.find_card_name(pci_bdf)
 
         # run offload command in other process
-        dri_pci_name_format = re.sub("[:.]", "_", pci_name)
-
-        if "timeout" in cmd:
-            raise SystemExit("Put timeout in command isn't allowed")
+        dri_pci_bdf_format = re.sub("[:.]", "_", pci_bdf)
 
         cmd = cmd.split()
         (modified_cmd, timeout) = self._reformat_cmd_timeout(cmd, timeout)
@@ -315,7 +335,7 @@ class PrimeOffloader:
                 "__GLX_VENDOR_LIBRARY_NAME": "nvidia",
             }
         else:
-            offload_env = {"DRI_PRIME": "pci-{}".format(dri_pci_name_format)}
+            offload_env = {"DRI_PRIME": "pci-{}".format(dri_pci_bdf_format)}
 
         env.update(offload_env)
         self.logger.info("prime offload env: {}".format(offload_env))
@@ -357,7 +377,7 @@ class PrimeOffloader:
             "-p",
             "--pci",
             type=str,
-            help="pci name in NNNN:NN:NN.N format, such as 0000:00:02.0",
+            help="pci device bdf in NNNN:NN:NN.N format, such as 0000:00:02.0",
         )
         parser.add_argument(
             "-d",
@@ -391,10 +411,11 @@ class PrimeOffloader:
         self.logger.addHandler(console_handler)
 
         if args.pci and args.driver:
-            # run_offload_cmd("glxgears", "0000:00:02.0", "i915", 0)
-            self.run_offload_cmd(args.command, args.pci, args.driver, args.timeout)
+            # cmd_checker("glxgears", "0000:00:02.0", "i915", 0)
+            self.cmd_checker(args.command, args.pci, args.driver, args.timeout)
         else:
-            self.run_cmd(args.command, args.timeout)
+            # cmd_finder("glxgears", 0)
+            self.cmd_finder(args.command, args.timeout)
 
 
 if __name__ == "__main__":
