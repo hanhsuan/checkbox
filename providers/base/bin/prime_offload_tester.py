@@ -173,7 +173,7 @@ class PrimeOffloader:
         )
         return data_in_name.split()[1].split("=")[1]
 
-    def find_offload(self, cmd: list, timeout: str):
+    def find_offload(self, cmd: str, timeout: int):
         """
         Use to find provided command is executed on which GPU.
 
@@ -196,10 +196,10 @@ class PrimeOffloader:
         while time.time() < deadline:
             time.sleep(delay)
             card_path = self._run_command(find_cmd)
-            if card_path:
+            if "/sys/kernel/debug/dri" in card_path:
                 try:
-                    # The graphic will be shown such as 0 and 128 at the same time.
-                    # Therefore, pick up the first one
+                    # The graphic will be shown such as 0 and 128
+                    # at the same time. Therefore, pick up the first one
                     first_card = card_path.splitlines()[0]
                     bdf = self._find_bdf(first_card)
                     self.logger.info("Process is running on:")
@@ -248,9 +248,11 @@ class PrimeOffloader:
                 "No prime-select, it should be ok to run prime offload"
             )
 
-    def _reformat_cmd_timeout(self, cmd: list, timeout: int) -> (list, int):
+    def _reformat_cmd_timeout(self, cmd: str, timeout: int) -> (list, int):
         if "timeout" in cmd:
             raise SystemExit("Put timeout in command isn't allowed")
+
+        cmd = cmd.split()
 
         if timeout > 0:
             offload_cmd = ["timeout", str(timeout)] + cmd
@@ -267,7 +269,7 @@ class PrimeOffloader:
             offload_cmd = cmd
         return (offload_cmd, timeout)
 
-    def cmd_runner(self, cmd: str, env: dict = None):
+    def cmd_runner(self, cmd: list, env: dict = None):
         try:
             with subprocess.Popen(
                 cmd,
@@ -293,12 +295,11 @@ class PrimeOffloader:
 
         :param timeout: timeout for offloaded command
         """
-        cmd = cmd.split()
         (modified_cmd, timeout) = self._reformat_cmd_timeout(cmd, timeout)
 
         # use other thread to find offload
         find_thread = threading.Thread(
-            target=self.find_offload, args=(cmd[0], timeout)
+            target=self.find_offload, args=(cmd, timeout)
         )
         find_thread.start()
         self.cmd_runner(modified_cmd)
@@ -325,7 +326,6 @@ class PrimeOffloader:
         # run offload command in other process
         dri_pci_bdf_format = re.sub("[:.]", "_", pci_bdf)
 
-        cmd = cmd.split()
         (modified_cmd, timeout) = self._reformat_cmd_timeout(cmd, timeout)
 
         env = os.environ.copy()
@@ -348,7 +348,7 @@ class PrimeOffloader:
             target=self.check_offload, args=(cmd, card_id, card_name, timeout)
         )
         check_thread.start()
-        self.cmd_runner(modified_cmd)
+        self.cmd_runner(modified_cmd, env)
         check_thread.join()
 
         if self.check_result:
