@@ -22,6 +22,10 @@ from prime_offload_tester import *
 
 
 class RunCmdTests(unittest.TestCase):
+    """
+    This function should execute command and raise SystemExit if fail.
+    """
+
     @patch("subprocess.check_output")
     def test_run_command_succ(self, mock_check):
         po = PrimeOffloader()
@@ -267,6 +271,11 @@ class FindCardNameTests(unittest.TestCase):
 
 
 class GetClientsTests(unittest.TestCase):
+    """
+    This function should return the data in the right
+    "/sys/kernel/debug/dri/*/clients"
+    """
+
     @patch("prime_offload_tester.PrimeOffloader._run_command")
     def test_get_clients(self, mock_cmd):
         po = PrimeOffloader()
@@ -314,6 +323,11 @@ class CheckOffloadTests(unittest.TestCase):
 
 
 class FindBDFTests(unittest.TestCase):
+    """
+    This function should return the BDF in the right
+    "/sys/kernel/debug/dri/*/name"
+    """
+
     @patch("prime_offload_tester.PrimeOffloader._run_command")
     def test_find_bdf(self, mock_cmd):
         po = PrimeOffloader()
@@ -324,6 +338,11 @@ class FindBDFTests(unittest.TestCase):
 
 
 class FindOffloadTests(unittest.TestCase):
+    """
+    This function should try to find which GPU is the renderer
+    for the specific command.
+    """
+
     @patch("time.sleep", return_value=None)
     @patch("prime_offload_tester.PrimeOffloader._run_command")
     def test_found(self, mock_cmd, mock_sleep):
@@ -419,6 +438,11 @@ class CheckNvOffloadEnvTests(unittest.TestCase):
 
 
 class ReformatCmdTimeoutTests(unittest.TestCase):
+    """
+    This function should return the right format command with timeout setting
+    and the real timeout for futher usage.
+    """
+
     def test_timeout_in_cmd(self):
         po = PrimeOffloader()
         with self.assertRaises(SystemExit):
@@ -438,6 +462,11 @@ class ReformatCmdTimeoutTests(unittest.TestCase):
 
 
 class CmdRunnerTests(unittest.TestCase):
+    """
+    This function should run the command with Popen mode
+    and the right environment variables.
+    """
+
     o_env = {"DRI_PRIME": "pci-0000_00_00_0"}
 
     @patch("subprocess.Popen")
@@ -462,6 +491,10 @@ class CmdRunnerTests(unittest.TestCase):
 
 
 class CmdFinderTests(unittest.TestCase):
+    """
+    This function should find the command is rendered by which GPU
+    """
+
     @patch("prime_offload_tester.PrimeOffloader.cmd_runner")
     def test_found(self, mock_runner):
         po = PrimeOffloader()

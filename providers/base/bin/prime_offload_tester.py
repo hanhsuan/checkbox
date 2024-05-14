@@ -17,14 +17,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Checkbox.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
-import threading
 import subprocess
-import time
-import re
-import json
+import threading
 import argparse
 import logging
+import time
+import json
+import sys
+import re
 import os
 
 
@@ -185,11 +185,13 @@ class PrimeOffloader:
 
         deadline = time.time() + timeout
 
+        cmd = cmd.split()
+
         find_cmd = [
             "grep",
             "-lr",
             "--include=clients",
-            cmd,
+            cmd[0],
             "/sys/kernel/debug/dri",
         ]
 
@@ -249,6 +251,15 @@ class PrimeOffloader:
             )
 
     def _reformat_cmd_timeout(self, cmd: str, timeout: int) -> (list, int):
+        """
+        use to reformat the command with correct timeout setting
+
+        :param cmd: the command will be executed
+
+        :param timeout: timeout
+
+        :returns: reformated command and real timeout
+        """
         if "timeout" in cmd:
             raise SystemExit("Put timeout in command isn't allowed")
 
@@ -270,6 +281,14 @@ class PrimeOffloader:
         return (offload_cmd, timeout)
 
     def cmd_runner(self, cmd: list, env: dict = None):
+        """
+        use to execute command and piping the output to the screen.
+
+        :param cmd: the command will be executed
+
+        :param env: the environment variables for executing command
+
+        """
         try:
             with subprocess.Popen(
                 cmd,
