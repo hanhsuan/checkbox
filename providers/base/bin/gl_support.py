@@ -19,23 +19,42 @@
 
 import subprocess
 import re
+import os
 
 
 class GLSupport:
+    """
+    This is a simple class to use unity_support_test to verify
+    OpenGL is supported or not
+    """
+
+    def remove_color_code(self, string: str) -> str:
+        """
+        Use to make the color code removing could be unit tested
+
+        :param string: the string that you would like to remove color code
+        """
+
+        return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", string)
+
     def is_support_opengl(self):
+        cr = os.getenv("CHECKBOX_RUNTIME", default="")
         cmd = [
-            "/usr/lib/nux/unity_support_test",
+            "{}/usr/lib/nux/unity_support_test".format(cr),
             "-p",
         ]
-        rv = subprocess.run(
-            cmd,
-            universal_newlines=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        print(re.sub("\\[[0-9;]*m", "", rv.stdout))
+        try:
+            rv = subprocess.run(
+                cmd,
+                universal_newlines=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            raise SystemExit("running cmd:[{}] fail:{}".format(cmd, repr(e)))
+        print(self.remove_color_code(rv.stdout))
         if rv.returncode != 0:
-            raise SystemExit("System doesn't support OpenGL")
+            raise SystemExit("Some OpenGL functions might not be supported")
 
 
 if __name__ == "__main__":
