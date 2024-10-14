@@ -125,6 +125,36 @@ class GnomeRandrCycler:
                         )
         return highest_modes
 
+    def _create_path(self, keyword: str, screenshot_dir: str) -> str:
+        """
+        create the folder for storing screenshot
+
+        :param keyword: A keyword to distinguish the screenshots
+                        taken in this run of the script
+
+        :param screenshot_dir: Specify a directory to store screenshots in.
+        """
+
+        screenshot_path = os.path.join(screenshot_dir, "xrandr_screens")
+
+        if keyword:
+            screenshot_path = screenshot_path + "_" + keyword
+        os.makedirs(screenshot_path, exist_ok=True)
+        return screenshot_path
+
+    def _tar_screenshot(self, screenshot_path: str):
+        """
+        Tar up the screenshots for uploading
+
+        :param screenshot_path: where the screenshots are.
+        """
+        try:
+            with tarfile.open(screenshot_path + ".tgz", "w:gz") as screen_tar:
+                for screen in os.listdir(screenshot_path):
+                    screen_tar.add(screenshot_path + "/" + screen, screen)
+        except (IOError, OSError):
+            pass
+
     def monitor_resolution_cycling(self, keyword: str, screenshot_dir: str):
         """
         Loop changing the resolution
@@ -136,11 +166,7 @@ class GnomeRandrCycler:
         """
         failures = 0  # count the number of failed modesets
 
-        screenshot_path = os.path.join(screenshot_dir, "xrandr_screens")
-
-        if keyword:
-            screenshot_path = screenshot_path + "_" + keyword
-        os.makedirs(screenshot_path, exist_ok=True)
+        screenshot_path = self._create_path(keyword, screenshot_dir)
 
         (monitors, current_modes) = self.get_monitor_infos()
 
@@ -155,9 +181,7 @@ class GnomeRandrCycler:
             )
             cmd = "gnome-randr modify " + monitor + " -m " + mode
             try:
-                subprocess.run(
-                    cmd, check=True, shell=True, stdout=subprocess.PIPE
-                )
+                subprocess.check_output(cmd, shell=True)
                 mode_string = monitor + "_" + resolution
                 filename = os.path.join(screenshot_path, mode_string + ".jpg")
                 cmd = "gnome-screenshot -f " + filename
@@ -177,13 +201,7 @@ class GnomeRandrCycler:
                 )
             time.sleep(8)  # let the hardware recover a bit
 
-        # Tar up the screenshots for uploading
-        try:
-            with tarfile.open(screenshot_path + ".tgz", "w:gz") as screen_tar:
-                for screen in os.listdir(screenshot_path):
-                    screen_tar.add(screenshot_path + "/" + screen, screen)
-        except (IOError, OSError):
-            pass
+        self._tar_screenshot(screenshot_path)
 
         if failures != 0:
             raise SystemExit(
