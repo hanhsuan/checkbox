@@ -22,11 +22,10 @@ Original script that inspired this class:
 """
 
 from collections import namedtuple
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Callable
 from gi.repository import GLib, Gio
 from fractions import Fraction
 import itertools
-import time
 
 from checkbox_support.monitor_config import MonitorConfig
 
@@ -114,12 +113,28 @@ class MonitorConfigGnome(MonitorConfig):
         res: bool = True,
         max_res_amount: int = 5,
         trans: bool = False,
-        time_wait: int = 10,
-        log=None,
-        action=None,
+        log: Callable[str] = None,
+        action: Callable[str] = None,
     ):
         """
-        Cycling change the monitors configurations
+        Cycling change the monitors configurations automatically
+
+        Args:
+            res: Cycling the resolution or not.
+
+            max_res_amount: The supported resolution might be a lot
+                            and this could limited test amount.
+
+            trans: Cycling the transform or not.
+
+            log: For logging, the string is constructed by
+                 [monitor name]_[resolution]_[transform]_.
+
+            action: For extra steps for each cycle,
+                    the string is constructed by
+                    [monitor name]_[resolution]_[transform]_.
+                    Please note that the delay is needed inside this
+                    callback to wait the monitors to response
         """
         monitors = []
         modes_list = []
@@ -138,21 +153,14 @@ class MonitorConfigGnome(MonitorConfig):
                 logical_monitors = []
                 position_x = 0
                 m_list = list(mode)
+                uni_string = ""
                 for monitor in monitors:
                     m = m_list.pop(0)
-                    if log:
-                        log(
-                            "[{}] res:[{}], trans[{}]".format(
-                                monitor,
-                                m.resolution,
-                                {
-                                    0: "normal",
-                                    1: "left",
-                                    3: "right",
-                                    6: "inverted",
-                                }.get(trans),
-                            )
-                        )
+                    uni_string += "{}_{}_{}_".format(
+                        monitor,
+                        m.resolution,
+                        {0: "normal", 1: "left", 3: "right", 6: "inverted"},
+                    )
                     logical_monitors.append(
                         (
                             position_x,
@@ -163,14 +171,17 @@ class MonitorConfigGnome(MonitorConfig):
                             [(monitor, m.id, {})],
                         )
                     )
+                    # left and right should convert x and y
                     xy = 1 if (trans == 1 or trans == 3) else 0
                     position_x += int(m.resolution.split("x")[xy])
                 self._apply_monitors_config(state[0], logical_monitors)
+                if log:
+                    log(uni_string)
                 if action:
                     action()
-                time.sleep(time_wait)
             if not res:
                 break
+        # change back to preferred monitor configuration
         self.set_extended_mode()
 
     def _resolution_filter(self, modes: List[Mode], max_res_amount: int):
