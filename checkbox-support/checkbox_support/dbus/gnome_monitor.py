@@ -178,7 +178,7 @@ class MonitorConfigGnome(MonitorConfig):
                 if log:
                     log(uni_string)
                 if action:
-                    action()
+                    action(uni_string)
             if not res:
                 break
         # change back to preferred monitor configuration
